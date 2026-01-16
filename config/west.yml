@@ -16,7 +16,8 @@ manifest:
       import: app/west.yml
     - name: cirque-input-module
       remote: geeksville
-      revision: main
+      # FIXME DO NOT SHIP LIKE THIS, for dev mode only
+      revision: dev
     - name: zmk-rgbled-widget
       remote: caksoylar
       revision: main

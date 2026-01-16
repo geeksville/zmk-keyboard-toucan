@@ -26,5 +26,7 @@ include:
   - board: seeeduino_xiao_ble
     shield: toucan_right rgbled_adapter
     cmake-args: -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y
+    # FIXME DO NOT SHIP WITH THIS, it burns lots of battery
+    snippet: zmk-usb-logging
   - board: seeeduino_xiao_ble
     shield: settings_reset
