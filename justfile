@@ -33,43 +33,27 @@ build-init:
     west update       # Update modules 
     west zephyr-export # Needed to prevent confusing cmake    
 
-# Build for the eyelash_corne with miryoku keymap
-build-miryoku: build-init 
-    #!/usr/bin/env bash
-    set -e # Stop on error
-    cd /workspaces/zmk/app
-  
-    echo "Doing initial build to setup build dirs"
-    # -p is important otherwise cmake ignores new -D flags
-    # Note: don't add -DCONFIG_ZMK_POINTING=y -DCONFIG_ZMK_DISPLAY=y etc here instead do it in eyelash_corne_left/right_defconfig
-    west build -p -d build/eyelash_corne_left -b eyelash_corne_left -- \
-        -DZMK_CONFIG=/workspaces/zmk-config/config \
-        -DZMK_EXTRA_MODULES=/workspaces/zmk-modules/corne-j-geeksville \
-        -DSHIELD=nice_view
-    west build -p -d build/eyelash_corne_right -b eyelash_corne_right -- \
-        -DZMK_CONFIG=/workspaces/zmk-config/config \
-        -DZMK_EXTRA_MODULES=/workspaces/zmk-modules/corne-j-geeksville \
-        -DSHIELD=nice_view       
-    # Note: When adding multiple modules, make sure they are separated by ;
-
 # Build for the beekeeb toucan
-build-toucan: build-init 
+build-toucan *args: 
     #!/usr/bin/env bash
     set -e # Stop on error
     cd /workspaces/zmk/app
-    echo "Doing initial build to setup build dirs"
+
     # -p is important otherwise cmake ignores new -D flags
     # Note: don't add -DCONFIG_ZMK_POINTING=y -DCONFIG_ZMK_DISPLAY=y etc here instead do it in eyelash_corne_left/right_defconfig
-    west build -p -d build/toucan_left -b seeeduino_xiao_ble -S studio-rpc-usb-uart -- \
+    west build -p -d build/toucan_left -b seeeduino_xiao_ble -S studio-rpc-usb-uart {{ args}} -- \
         -DZMK_CONFIG=/workspaces/zmk-modules/zmk-keyboard-toucan \
         -DSHIELD="toucan_left rgbled_adapter nice_view_gem" \
         -DZMK_EXTRA_MODULES="/workspaces/zmk-modules/zmk-rgbled-widget"\
-        -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y
-    west build -p -d build/toucan_right -b seeeduino_xiao_ble -- \
+        -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y 
+    west build -p -d build/toucan_right -b seeeduino_xiao_ble -S zmk-usb-logging {{ args}} -- \
         -DZMK_CONFIG=/workspaces/zmk-modules/zmk-keyboard-toucan \
         -DSHIELD="toucan_right rgbled_adapter" \
         -DZMK_EXTRA_MODULES="/workspaces/zmk-modules/zmk-rgbled-widget;/workspaces/zmk-modules/cirque-input-module" \
-        -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y
+        -DCONFIG_ZMK_SLEEP=y -DCONFIG_ZMK_PM_SOFT_OFF=y -DCONFIG_INPUT_LOG_LEVEL_DBG=y 
+
+# Uncomment if you are using logging and want to see touchpad debug messages (logging is very power expensive though)
+# -DCONFIG_INPUT_LOG_LEVEL_DBG=y
 
 build:
     #!/usr/bin/env bash
@@ -79,6 +63,46 @@ build:
     west build -d build/left
     west build -d build/right
     find /workspaces/zmk/app -name \*.uf2  
+
+
+out := "/home/kevinh/development/keyboard/zmk/app/build"
+
+# Flash firmware to keyboard (internal helper)
+_flash artifact:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mount_point="/run/media/kevinh/NICENANO"
+    device="/dev/sda"
+    uf2_file="{{ out }}/{{ artifact }}/zephyr/zmk.uf2"
+    
+    # Ensure unmount happens on exit, even if previous operations fail
+    trap 'if mountpoint -q "$mount_point" 2>/dev/null; then sudo umount "$mount_point" 2>/dev/null || true; fi' EXIT
+    
+    if [[ ! -f "$uf2_file" ]]; then
+        echo "Error: $uf2_file not found. Build first." >&2
+        exit 1
+    fi
+    
+    # Mount if not already mounted
+    if ! mountpoint -q "$mount_point"; then
+        echo "Mounting $device to $mount_point..."
+        sudo mkdir -p "$mount_point"
+        sudo mount "$device" "$mount_point"
+    fi
+    
+    echo "Copying $uf2_file to $mount_point..."
+    sudo cp "$uf2_file" "$mount_point/zmk.uf2"
+    sync
+    
+    echo "Done! {{ artifact }} flashed."
+
+# Flash left toucan keyboard
+flash-toucan-left:
+    just _flash toucan_left
+
+# Flash right toucan keyboard
+flash-toucan-right:
+    just _flash toucan_right
 
 extra:
     sudo apt install python3 libglib2.0-dev pipx
