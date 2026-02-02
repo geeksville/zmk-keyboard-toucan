@@ -216,7 +216,8 @@ static int display_activity_event_handler(const zmk_event_t *eh) {
     switch (ev->state) {
     case ZMK_ACTIVITY_ACTIVE:
         set_sleep_screen_active(false);
-        force_redraw_all_widgets();
+        // No need to force a redraw, it will happen automatically if really coming back from sleep (ACTIVE also comes after IDLE)
+        //force_redraw_all_widgets();
         break;
     case ZMK_ACTIVITY_SLEEP:
         set_sleep_screen_active(true);
